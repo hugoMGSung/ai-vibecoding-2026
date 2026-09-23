@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class Price(BaseModel):
     symbol: str
+    name: str = ""
     price: Decimal = Field(gt=0)
     currency: str = "KRW"
 
@@ -33,3 +34,23 @@ class Portfolio(BaseModel):
     positions: dict[str, Decimal]
     realized_pnl: Decimal
 
+
+class Recommendation(BaseModel):
+    rank: int
+    score: int
+    name: str
+    symbol: str
+    price: Decimal
+    currency: str
+    recommended_quantity: int
+    recommended_amount: Decimal
+    indicators: str = "시세 기반 후보"
+
+
+class Candle(BaseModel):
+    timestamp: str
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal = Decimal("0")

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>소액투자 트레이더</title><link rel="stylesheet" href="/static/style.css?v=99"><link rel="stylesheet" href="/static/toss.css?v=99"><link rel="stylesheet" href="/static/v7.css?v=99"><link rel="stylesheet" href="/static/v9.css?v=99">
+</head>
+<body>
+<header><div><span class="logo">T</span><b>소액투자 트레이더</b></div><div class="header-actions"><span class="refresh-note">5분 자동갱신</span><button id="resetPaper" class="connect reset">PAPER 초기화</button><button id="refreshDashboard" class="connect">새로고침</button><button id="connect" class="connect">토스 연결 확인</button><span class="paper">{{ mode }} · 실제 주문 차단</span></div></header>
+<main>
+  <section id="connectionAlert" class="connection-alert hidden"><div><b>WTS 허용 IP 등록 필요</b><p>현재 공인 IP를 토스증권 WTS에 등록한 뒤 연결 복구를 확인하세요. 확인 전에는 신규 자동매수가 잠깁니다.</p></div><button id="recoverConnection">연결 복구 확인</button></section>
+  <section class="hero"><div><small>가상 계좌 잔액</small><h1 id="cash">-</h1><p>기본 {{ "{:,}".format(paper_initial_cash) }}원 · 추천 사용 {{ "{:,}".format(default_budget) }}원</p></div>
+    <form id="scanForm"><label>이번 추천에 사용할 금액</label><div class="input"><input id="budget" type="number" value="{{ default_budget }}" min="10000" step="10000"><button>후보 찾기</button></div></form></section>
+  <section><div class="title"><div><h2>추천 후보 TOP 5</h2><p id="filterStats">전체 보통주에서 가격·유동성·위험 조건을 검사합니다.</p></div><span id="source"></span></div><div id="cards" class="cards"></div></section>
+  <section><div class="title"><div><h2>가상매매 성과</h2><p>실제 현재가로 평가한 모의 운용 결과입니다.</p></div></div><div id="performance" class="performance"></div></section>
+  <section class="panel auto-panel"><div class="title"><div><h2>PAPER 자동매매</h2><p>정규장에만 신규 자동매수와 보호 매도를 실행합니다. 실제 주문은 차단되어 있습니다.</p></div><div><span id="marketStatus" class="market-badge">장 상태 확인 중</span><button id="automationToggle" class="danger-button">상태 확인 중</button></div></div>
+    <div class="automation-grid"><div><b>자동매수</b><span id="autoBuyStatus"></span><div id="autoBuyRules"></div></div><div><b>자동 손절·익절</b><span id="autoStatus">확인 중</span><div id="autoRules"></div></div></div>
+    <div id="autoSignals" class="auto-signals"></div>
+  </section>
+  <section class="v9-grid"><div class="panel"><h2>오늘의 PAPER 보고서</h2><div id="dailyReport"></div></div><div class="panel"><h2>백테스트와 PAPER 비교</h2><div id="performanceCompare"></div></div></section>
+  <section class="panel daily-history"><div class="title"><div><h2>일별 매매 성과</h2><p>5분마다 오늘 기록을 갱신하고 날짜가 바뀌면 전날 기록을 확정합니다.</p></div></div><div id="dailyPerformanceHistory"></div></section>
+  <section class="panel settings-panel"><div class="title"><div><h2>자동매매 위험 설정</h2><p>저장 즉시 다음 자동 검사부터 적용됩니다.</p></div></div>
+    <form id="automationConfigForm" class="config-form">
+      <label>손절 %<input id="cfgStop" type="number" step="0.1" min="0.1" max="50"></label><label>익절 %<input id="cfgTake" type="number" step="0.1" min="0.1" max="100"></label><label>추적 손절 %<input id="cfgTrailing" type="number" step="0.1" min="0.1" max="50"></label><label>최대 보유일<input id="cfgHolding" type="number" min="1" max="365"></label><label>최소 점수<input id="cfgScore" type="number" min="1" max="100"></label><label>최대 종목<input id="cfgPositions" type="number" min="1" max="20"></label><label>주문 한도<input id="cfgOrder" type="number" min="1000" step="10000"></label><label>일손실 제한 %<input id="cfgDailyLoss" type="number" step="0.1" min="0.1" max="50"></label><button>설정 저장</button>
+    </form>
+  </section>
+  <section class="grid"><div class="panel"><h2>가상 보유 종목</h2><div id="holdings"></div></div><div class="panel"><h2>최근 거래</h2><div id="trades"></div></div></section>
+  <section class="panel history"><h2>추천 이력과 현재 수익률</h2><div id="history"></div></section>
+  <section class="panel events-panel"><div class="title"><div><h2>자동매매 판단 로그</h2><p>매수·제외·오류·중지 이유를 확인합니다.</p></div><a class="csv-button" href="/api/paper/trades.csv">거래 CSV 다운로드</a></div><div id="automationEvents"></div></section>
+  <section class="panel backtest"><div class="title"><div><h2>과거 일봉 백테스트</h2><p>종가 신호 다음 거래일 시가 매수, 손절·익절·최대 보유기간 규칙을 검증합니다.</p></div></div>
+    <form id="backtestForm" class="backtest-form">
+      <label>종목코드<input id="btSymbol" value="005930" required></label>
+      <label>초기 투자금<input id="btCash" type="number" value="1000000" min="100000" step="100000"></label>
+      <label>손절 %<input id="btStop" type="number" value="5" min="0.1" max="50" step="0.1"></label>
+      <label>익절 %<input id="btTake" type="number" value="10" min="0.1" max="100" step="0.1"></label>
+      <label>최대 보유일<input id="btDays" type="number" value="20" min="1" max="100"></label>
+      <button>백테스트 실행</button>
+    </form><div id="backtestResult" class="empty">조건을 입력하고 백테스트를 실행하세요.</div>
+  </section>
+  <section class="panel real"><div class="title"><div><h2>토스증권 실계좌 조회</h2><p>조회 전용이며 주문 기능은 연결되어 있지 않습니다.</p></div><span id="tossStatus">미연결</span></div><div id="realHoldings" class="empty">연결 확인을 누르면 계좌와 보유 주식을 조회합니다.</div></section>
+</main><div id="toast"></div><script src="/static/app.js?v=99"></script>
+</body></html>

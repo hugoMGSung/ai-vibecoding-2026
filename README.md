@@ -71,6 +71,12 @@ AI에게 코딩을 시키자, 제대로!
 - 원샷 프롬프트 : 적어도 한줄의 요구사항을 작성해서 바이브코딩
 - 퓨샷 프롬프트 : PRD를 작성해서 바이브코딩
 
+
+#### 프롬프트 사용법
+
+- 이미지를 캡쳐해서 복사/붙여넣기 후 프롬프트 사용
+- 특정 소스코드를 선택한 뒤 우클릭으로` Add to Codex Threaed` 선택 훠 프롬프트 사용
+
 ### 주식 자동매매 개발환경
 
 #### 토스증권 OpenAPI
@@ -90,8 +96,47 @@ AI에게 코딩을 시키자, 제대로!
 - 토스앱 모바일로 로그인 인증
 - 오른쪽 하단 기어모양 아이콘(설정)
 
-
 ![](assets/20260921_170830_image.png)
 
 - Client Id, `Client Secret`, IP 추가
 - cmd > ipconfig로 보인 아이피 확인 후 추가
+
+### 주식 자동매매 파이썬 프로그램 분석
+
+- `__init__.py` - 일반적으로 파일만 생성. 소스코드 X 프로젝트 폴더가 pip로 설치할 수 있는 패키지화
+- `__main__.py` - 파이썬으로 실행될때 가장 먼저 실행되는 메인 함수 파일
+- `__pycache__` - 미리 만들어놓은 파이썬 실행 파일(캐시)
+- tests - 소스코드 테스트 실행을 위한 폴더
+- .env.example - 환경설정 예제파일 .example을 지우고 사용
+  `.env` 는 깃허브에 업로드 방지위해 .gitignore에 제외파일로 등록
+- requirements.txt - 파이썬 개발환경 패키지 설치리스트 파일
+  - `pip install -r requirements.txt` 로 전부 설치
+
+#### HTTP 403 문제
+
+![](assets/20260923_112110_image.png)
+
+- 공인아이피 확인 - findip.kr 등 사이트에서 확인
+
+![](assets/20260923_114916_image.png)
+
+- 토스 API 설정화면에서 IP 등록
+
+![](assets/20260923_115030_image.png)
+
+- 실행화면
+
+![](assets/20260923_114044_image.png)
+
+#### favicon.ico 작업
+
+- https://flaticon.com 에서 원하는 이미지 png 다운로드
+- https://convertio.co 에서 png를 ico로 변환. 다운로드
+- favicon.ico로 이름 변경
+- static 폴더에 복사
+- index.html에 아래코드 추가
+
+```html
+<title>Toss Auto Trader</title>
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+```

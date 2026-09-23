@@ -1,0 +1,135 @@
+:root {
+    font-family: system-ui, sans-serif;
+    color: #172033;
+    background: #f5f7fb;
+    color-scheme: light;
+    --page-bg: #f5f7fb;
+    --surface: #fff;
+    --text: #172033;
+    --muted: #667085;
+    --border: #e5e7eb;
+    --subtle: #f8fafc
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg: #101828;
+    --surface: #1d2939;
+    --text: #f2f4f7;
+    --muted: #98a2b3;
+    --border: #344054;
+    --subtle: #25314a
+}
+
+body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text);
+    transition: background-color .2s ease, color .2s ease
+}
+
+html {
+    background: var(--page-bg)
+}
+
+main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 20px 80px
+}
+
+h1 {
+    margin-bottom: 4px
+}
+
+.top-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 18px }
+.status-button { min-height: 36px; padding: 0 13px; border: 0; border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer }
+.refresh-button { background: #344054 }
+.status-checking { background: #98a2b3 }
+.status-connected { background: #12b76a }
+.status-failed { background: #d92d20 }
+.mode-paper { background: #155eef }
+.mode-dry-run { background: #7f56d9 }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px }
+.section-heading h2 { margin: 0 }
+.recommendations { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px }
+.recommendation-item { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: var(--surface); min-width: 0 }
+.recommendation-rank { color: #039855; font-weight: 700; font-size: 13px }
+.recommendation-item h3 { margin: 12px 0 2px; font-size: 18px; overflow-wrap: anywhere }
+.recommendation-name { cursor: pointer }
+.recommendation-name:hover { color: #3478f6; text-decoration: underline }
+.recommendation-symbol, .recommendation-item p { color: var(--muted); font-size: 13px }
+.recommendation-price { font-size: 21px; font-weight: 800; margin: 14px 0 }
+.indicator-box { background: var(--subtle); color: var(--muted); border-radius: 10px; padding: 10px; font-size: 12px }
+.paper-buy { width: 100%; min-height: 40px; background: #3478f6; color: white; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer }
+.chart-card canvas { display: block; width: 100%; height: 460px }
+.capital-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px }
+.capital-grid > div { background: var(--subtle); border-radius: 10px; padding: 16px }
+.label { display: block; color: #667085; font-size: 13px; margin-bottom: 8px }
+.capital-grid strong { font-size: 22px }
+
+.muted {
+    color: var(--muted)
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-top: 20px;
+    box-shadow: 0 4px 14px #1018280a
+}
+
+.row {
+    display: flex;
+    gap: 8px
+}
+.search-results { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px }
+.search-result { display: inline-flex; gap: 8px; align-items: center; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer }
+.search-result span { color: var(--muted); font-size: 12px }
+
+input {
+    flex: 1;
+    padding: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 15px
+}
+
+button {
+    padding: 0 18px;
+    border: 0;
+    border-radius: 8px;
+    background: green;
+    color: #fff;
+    font-weight: 600
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px
+}
+
+th,
+td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid var(--border)
+}
+
+pre {
+    background: var(--subtle);
+    padding: 14px;
+    border-radius: 8px;
+    overflow: auto
+}
+
+.theme-toggle { position: fixed; left: 20px; bottom: 20px; z-index: 10; border: 1px solid var(--border); border-radius: 999px; padding: 10px 15px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #10182826; cursor: pointer; font-weight: 700 }
+.theme-toggle:hover { transform: translateY(-1px) }
+
+@media (max-width: 900px) { .recommendations { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 640px) { .top-actions { justify-content: flex-start } .capital-grid, .recommendations { grid-template-columns: 1fr } }
