@@ -1,8 +1,10 @@
 from decimal import Decimal
 import random
+import asyncio
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -47,6 +49,9 @@ STOCK_ALIASES = {
     "sk텔레콤": "017670", "kt": "030200", "lg": "003550",
 }
 mode: Literal["PAPER", "DRY_RUN"] = settings.trading_mode if settings.trading_mode in ("PAPER", "DRY_RUN") else "PAPER"
+auto_task: asyncio.Task | None = None
+auto_state = {"running": False, "last_action": "", "message": "대기 중"}
+auto_history: list[dict[str, str]] = []
 app.mount("/static", StaticFiles(directory="auto_trader/static"), name="static")
 
 
@@ -142,6 +147,78 @@ def get_capital() -> dict[str, Decimal | str]:
         "recommended_ratio": settings.recommended_trade_ratio,
         "currency": "KRW",
     }
+
+
+@app.get("/api/v1/auto-trader/status")
+def auto_trader_status() -> dict[str, str | bool]:
+    return {**auto_state, "mode": mode}
+
+
+@app.get("/api/v1/auto-trader/history")
+def auto_trader_history() -> list[dict[str, str]]:
+    return auto_history[-20:][::-1]
+
+
+def record_auto_event(event: str, detail: str) -> None:
+    from datetime import datetime
+    auto_history.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "event": event, "detail": detail})
+
+
+async def paper_auto_loop() -> None:
+    while auto_state["running"]:
+        try:
+            candidates = await recommendations()
+            if candidates:
+                candidate = candidates[0]
+                existing = broker.portfolio().positions.get(candidate.symbol, Decimal("0"))
+                if existing == 0:
+                    order = broker.place(OrderRequest(symbol=candidate.symbol, side="BUY", quantity=Decimal(candidate.recommended_quantity), price=candidate.price), "PAPER")
+                    auto_state["last_action"] = f"{candidate.name} {order.status}"
+                    auto_state["message"] = f"{candidate.symbol} PAPER 매수 시뮬레이션 완료"
+                    record_auto_event("PAPER 매수", f"{candidate.name} ({candidate.symbol}) · {order.status} · {candidate.recommended_quantity}주")
+                else:
+                    auto_state["message"] = f"{candidate.symbol} 보유 중이라 중복 매수하지 않음"
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            auto_state["message"] = f"자동매매 일시 중단: {exc}"
+            await asyncio.sleep(60)
+
+
+@app.post("/api/v1/auto-trader/start")
+async def start_auto_trader() -> dict[str, str | bool]:
+    global auto_task
+    if mode != "PAPER":
+        raise HTTPException(400, "자동매매 v0.2는 PAPER 모드에서만 실행할 수 있습니다.")
+    if auto_task and not auto_task.done():
+        return auto_trader_status()
+    auto_state.update(running=True, message="PAPER 자동매매 시작")
+    record_auto_event("시작", "PAPER 자동매매를 시작했습니다.")
+    auto_task = asyncio.create_task(paper_auto_loop())
+    return auto_trader_status()
+
+
+@app.post("/api/v1/auto-trader/stop")
+async def stop_auto_trader() -> dict[str, str | bool]:
+    global auto_task
+    auto_state.update(running=False, message="PAPER 자동매매 중지")
+    record_auto_event("중지", "PAPER 자동매매를 중지했습니다.")
+    if auto_task and not auto_task.done():
+        auto_task.cancel()
+        await asyncio.gather(auto_task, return_exceptions=True)
+    auto_task = None
+    return auto_trader_status()
+
+
+class RatioUpdate(BaseModel):
+    ratio: Decimal = Field(ge=0, le=1)
+
+
+@app.put("/api/v1/capital/recommended-ratio")
+def update_recommended_ratio(request: RatioUpdate) -> dict[str, Decimal]:
+    settings.recommended_trade_ratio = request.ratio
+    return {"recommended_ratio": settings.recommended_trade_ratio}
 
 
 @app.get("/api/v1/recommendations", response_model=list[Recommendation])

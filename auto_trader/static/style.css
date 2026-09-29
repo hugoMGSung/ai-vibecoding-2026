@@ -25,11 +25,13 @@ body {
     margin: 0;
     background: var(--page-bg);
     color: var(--text);
+    min-height: 100vh;
     transition: background-color .2s ease, color .2s ease
 }
 
 html {
-    background: var(--page-bg)
+    background: var(--page-bg);
+    min-height: 100%;
 }
 
 main {
@@ -37,6 +39,9 @@ main {
     margin: 0 auto;
     padding: 48px 20px 80px
 }
+
+/* 시세 조회 카드는 DOM과 API 호환성을 위해 남겨두고 화면에서는 숨긴다. */
+main > section:first-of-type { display: none }
 
 h1 {
     margin-bottom: 4px
@@ -63,10 +68,18 @@ h1 {
 .indicator-box { background: var(--subtle); color: var(--muted); border-radius: 10px; padding: 10px; font-size: 12px }
 .paper-buy { width: 100%; min-height: 40px; background: #3478f6; color: white; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer }
 .chart-card canvas { display: block; width: 100%; height: 460px }
+.auto-card { margin-bottom: 20px }
+.auto-history { display: grid; gap: 8px }
+.history-row { display: grid; grid-template-columns: 155px 90px 1fr; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--subtle); font-size: 13px }
+.history-row time, .history-row span { color: var(--muted) }
 .capital-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px }
 .capital-grid > div { background: var(--subtle); border-radius: 10px; padding: 16px }
 .label { display: block; color: #667085; font-size: 13px; margin-bottom: 8px }
 .capital-grid strong { font-size: 22px }
+.ratio-control { margin-top: 18px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px }
+.ratio-row { display: flex; align-items: center; gap: 6px }
+.ratio-row input { width: 72px; padding: 8px; text-align: right }
+.ratio-row button { min-height: 36px; padding: 0 12px; cursor: pointer }
 
 .muted {
     color: var(--muted)
@@ -128,8 +141,9 @@ pre {
     overflow: auto
 }
 
-.theme-toggle { position: fixed; left: 20px; bottom: 20px; z-index: 10; border: 1px solid var(--border); border-radius: 999px; padding: 10px 15px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #10182826; cursor: pointer; font-weight: 700 }
+.theme-toggle { position: fixed; left: 20px; top: 20px; bottom: auto; z-index: 20; border: 1px solid var(--border); border-radius: 999px; padding: 10px 15px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #10182826; cursor: pointer; font-weight: 700 }
 .theme-toggle:hover { transform: translateY(-1px) }
 
 @media (max-width: 900px) { .recommendations { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
 @media (max-width: 640px) { .top-actions { justify-content: flex-start } .capital-grid, .recommendations { grid-template-columns: 1fr } }
+@media (max-width: 640px) { .history-row { grid-template-columns: 1fr; gap: 3px } }
