@@ -12,8 +12,9 @@ from .models import Candle, Order, OrderRequest, Portfolio, Price, Recommendatio
 from .paper import PaperBroker
 from .settings import settings
 from .toss_client import TossApiError, TossClient
+from .strategy import evaluate
 
-app = FastAPI(title="Toss Auto Trader", version="0.1.0")
+app = FastAPI(title="Toss Auto Trader", version="0.2.0")
 broker = PaperBroker(settings.paper_initial_cash)
 toss = TossClient()
 prices: dict[str, Price] = {}
@@ -48,6 +49,7 @@ STOCK_ALIASES = {
     "셀트리온제약": "068760", "유한양행": "000100", "한미약품": "128940",
     "sk텔레콤": "017670", "kt": "030200", "lg": "003550",
 }
+SYMBOL_NAMES = {symbol: name for name, symbol in STOCK_ALIASES.items()}
 mode: Literal["PAPER", "DRY_RUN"] = settings.trading_mode if settings.trading_mode in ("PAPER", "DRY_RUN") else "PAPER"
 auto_task: asyncio.Task | None = None
 auto_state = {"running": False, "last_action": "", "message": "대기 중"}
@@ -137,6 +139,30 @@ def get_portfolio() -> Portfolio:
     return broker.portfolio()
 
 
+@app.get("/api/v1/portfolio/summary")
+async def portfolio_summary() -> dict:
+    portfolio = broker.portfolio()
+    if portfolio.positions:
+        try:
+            live = await toss.prices(list(portfolio.positions))
+            prices.update({item.symbol: item for item in live})
+        except Exception:
+            pass
+    orders = [item for item in broker.orders() if item.status == "FILLED" and item.mode == "PAPER"]
+    rows, total_cost, total_value = [], Decimal("0"), Decimal("0")
+    for symbol, quantity in portfolio.positions.items():
+        buys = [item for item in orders if item.symbol == symbol and item.side == "BUY"]
+        sells = [item for item in orders if item.symbol == symbol and item.side == "SELL"]
+        cost = sum((item.quantity * item.price for item in buys), Decimal("0")) - sum((item.quantity * item.price for item in sells), Decimal("0"))
+        current = prices.get(symbol)
+        current_price = current.price if current else (buys[-1].price if buys else Decimal("0"))
+        value = quantity * current_price
+        total_cost += cost; total_value += value
+        display_name = (current.name if current and current.name else SYMBOL_NAMES.get(symbol, symbol))
+        rows.append({"symbol": symbol, "name": display_name, "quantity": quantity, "buy_amount": cost, "average_cost": (cost / quantity if quantity else Decimal("0")).quantize(Decimal("0.01")), "current_price": current_price, "market_value": value, "profit_loss": value - cost, "return_rate": (((value - cost) / cost * 100) if cost else Decimal("0")).quantize(Decimal("0.01"))})
+    return {"cash": portfolio.cash, "positions": rows, "total_cost": total_cost, "total_value": total_value, "total_return_rate": (((total_value - total_cost) / total_cost * 100) if total_cost else Decimal("0")).quantize(Decimal("0.01"))}
+
+
 @app.get("/api/v1/capital")
 def get_capital() -> dict[str, Decimal | str]:
     portfolio = broker.portfolio()
@@ -170,6 +196,13 @@ async def paper_auto_loop() -> None:
             candidates = await recommendations()
             if candidates:
                 candidate = candidates[0]
+                candles = await toss.candles(candidate.symbol, 60)
+                signal = evaluate(candles)
+                auto_state["message"] = f"{candidate.symbol} 전략 신호 {signal.action} ({signal.score}점)"
+                record_auto_event("전략 판단", f"{candidate.name} · {signal.action} · {signal.reason}")
+                if signal.action != "BUY":
+                    await asyncio.sleep(60)
+                    continue
                 existing = broker.portfolio().positions.get(candidate.symbol, Decimal("0"))
                 if existing == 0:
                     order = broker.place(OrderRequest(symbol=candidate.symbol, side="BUY", quantity=Decimal(candidate.recommended_quantity), price=candidate.price), "PAPER")

@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Local trading state
+auto_trader.db
+auto_trader.db-*

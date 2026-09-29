@@ -1,6 +1,14 @@
 const $ = (id) => document.getElementById(id);
 let selectedChartSymbol = null;
 let activeChartCandles = [];
+const portfolioCard = document.querySelector(".portfolio-card");
+const autoCard = document.querySelector(".auto-card");
+const chartCard = document.querySelector("#chart-card");
+if (portfolioCard) {
+  const insertBefore = chartCard || autoCard;
+  if (insertBefore) insertBefore.parentNode.insertBefore(portfolioCard, insertBefore);
+}
+if (autoCard) autoCard.parentNode.appendChild(autoCard);
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -79,9 +87,14 @@ if ($("search-results")) $("search-results").addEventListener("click", (event) =
   loadPrices();
 });
 
-async function loadPortfolio() { const r = await fetch("/api/v1/portfolio"); $("portfolio").textContent = JSON.stringify(await r.json(), null, 2); }
+async function loadPortfolio() { const r = await fetch("/api/v1/portfolio"); const portfolio = await r.json(); if ($("portfolio")) $("portfolio").textContent = JSON.stringify(portfolio, null, 2); const summary = await (await fetch("/api/v1/portfolio/summary")).json(); $("portfolio-summary").innerHTML = `<div class="portfolio-total"><div><span>보유 평가금액</span><strong>${Number(summary.total_value).toLocaleString()} KRW</strong></div><div><span>총 수익률</span><strong class="${Number(summary.total_return_rate) >= 0 ? "profit" : "loss"}">${Number(summary.total_return_rate).toFixed(2)}%</strong></div></div>${summary.positions.length ? `<table><thead><tr><th>종목</th><th>수량</th><th>매수가(주당)</th><th>현재가</th><th>평가금액</th><th>수익률</th></tr></thead><tbody>${summary.positions.map(item => `<tr><td>${item.name}<br><small>${item.symbol}</small></td><td>${item.quantity}</td><td>${Number(item.average_cost).toLocaleString()}</td><td>${Number(item.current_price).toLocaleString()}</td><td>${Number(item.market_value).toLocaleString()}</td><td class="${Number(item.return_rate) >= 0 ? "profit" : "loss"}">${Number(item.return_rate).toFixed(2)}%<br><small>${Number(item.profit_loss).toLocaleString()}</small></td></tr>`).join("")}</tbody></table>` : '<p class="muted">현재 보유한 주식이 없습니다.</p>'}`; }
 async function loadAutoStatus() { const response = await fetch("/api/v1/auto-trader/status"); const data = await response.json(); $("auto-status").textContent = `${data.running ? "실행 중" : "중지됨"} · ${data.message || ""}${data.last_action ? ` · ${data.last_action}` : ""}`; const history = await (await fetch("/api/v1/auto-trader/history")).json(); $("auto-history").innerHTML = history.length ? history.map(item => `<div class="history-row"><time>${item.time}</time><strong>${item.event}</strong><span>${item.detail}</span></div>`).join("") : '<p class="muted">기록이 없습니다.</p>'; }
+function syncAutoButton(running) { const button = $("auto-start"); if (!button) return; button.textContent = running ? "자동매매 중지" : "자동매매 시작"; button.classList.toggle("stop-button", running); }
 async function setAutoTrader(action) { const response = await fetch(`/api/v1/auto-trader/${action}`, { method: "POST" }); const data = await response.json(); if (!response.ok) { $("auto-status").textContent = data.detail || "자동매매 요청 실패"; return; } await loadAutoStatus(); await loadCapital(); await loadPortfolio(); }
+async function toggleAutoTrader() { const response = await fetch("/api/v1/auto-trader/status"); const data = await response.json(); await setAutoTrader(data.running ? "stop" : "start"); syncAutoButton(!data.running); }
+async function refreshDashboard() {
+  await Promise.allSettled([loadCapital(), loadPortfolio(), loadAutoStatus()]);
+}
 async function findCandidates() {
   $("recommendation-message").textContent = "추천 후보를 찾는 중...";
   $("recommendation-pipeline").textContent = "전체 2,601개 → 예산·유동성 30개 → 위험 제외 12개 → 지표 분석 12개";
@@ -172,8 +185,10 @@ if ($("load")) $("load").addEventListener("click", loadPrices);
 if ($("symbols")) $("symbols").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); loadPrices(); } });
 $("refresh-page").addEventListener("click", () => window.location.reload());
 $("toss-status").addEventListener("click", checkTossStatus);
-$("auto-start").addEventListener("click", () => setAutoTrader("start"));
-$("auto-stop").addEventListener("click", () => setAutoTrader("stop"));
+const autoStartButton = $("auto-start");
+const autoStopButton = $("auto-stop");
+if (autoStartButton) { autoStartButton.textContent = "자동매매 시작"; autoStartButton.addEventListener("click", toggleAutoTrader); }
+if (autoStopButton) autoStopButton.style.display = "none";
 $("find-candidates").addEventListener("click", findCandidates);
 $("recommendations").addEventListener("click", async (event) => {
   const name = event.target.closest(".recommendation-name");
@@ -195,3 +210,4 @@ $("recommendations").addEventListener("click", async (event) => {
   alert(response.ok ? `PAPER 주문 ${order.status}` : (order.detail || "주문 실패"));
 });
 loadPrices(); loadCapital(); loadPortfolio(); loadAutoStatus(); checkTossStatus(); loadMode();
+setInterval(refreshDashboard, 30000);

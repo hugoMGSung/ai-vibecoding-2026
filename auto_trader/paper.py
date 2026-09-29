@@ -1,16 +1,25 @@
 from decimal import Decimal
+import sqlite3
+from pathlib import Path
 from threading import Lock
 
 from .models import Order, OrderRequest, Portfolio
 
 
 class PaperBroker:
-    def __init__(self, initial_cash: Decimal = Decimal("10000000")) -> None:
-        self._cash = initial_cash
-        self._positions: dict[str, Decimal] = {}
-        self._realized_pnl = Decimal("0")
-        self._orders: list[Order] = []
-        self._next_id = 1
+    def __init__(self, initial_cash: Decimal = Decimal("10000000"), db_path: str = "auto_trader.db") -> None:
+        self._db_path = Path(db_path)
+        self._db = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._db.execute("CREATE TABLE IF NOT EXISTS paper_account (id INTEGER PRIMARY KEY CHECK (id=1), cash TEXT NOT NULL, realized_pnl TEXT NOT NULL)")
+        self._db.execute("CREATE TABLE IF NOT EXISTS paper_positions (symbol TEXT PRIMARY KEY, quantity TEXT NOT NULL)")
+        self._db.execute("CREATE TABLE IF NOT EXISTS paper_orders (id INTEGER PRIMARY KEY, client_order_id TEXT, symbol TEXT, side TEXT, quantity TEXT, price TEXT, status TEXT, mode TEXT)")
+        self._db.commit()
+        account = self._db.execute("SELECT cash, realized_pnl FROM paper_account WHERE id=1").fetchone()
+        self._cash = Decimal(account[0]) if account else initial_cash
+        self._realized_pnl = Decimal(account[1]) if account else Decimal("0")
+        self._positions = {row[0]: Decimal(row[1]) for row in self._db.execute("SELECT symbol, quantity FROM paper_positions")}
+        self._orders = [Order(id=row[0], client_order_id=row[1], symbol=row[2], side=row[3], quantity=row[4], price=row[5], status=row[6], mode=row[7]) for row in self._db.execute("SELECT id, client_order_id, symbol, side, quantity, price, status, mode FROM paper_orders ORDER BY id")]
+        self._next_id = (self._orders[-1].id + 1) if self._orders else 1
         self._lock = Lock()
 
     def portfolio(self) -> Portfolio:
@@ -41,4 +50,9 @@ class PaperBroker:
             order = Order(id=self._next_id, client_order_id=f"paper-{self._next_id}", **request.model_dump(), status=status, mode=mode)
             self._next_id += 1
             self._orders.append(order)
+            self._db.execute("INSERT OR REPLACE INTO paper_account(id, cash, realized_pnl) VALUES(1, ?, ?)", (str(self._cash), str(self._realized_pnl)))
+            self._db.execute("DELETE FROM paper_positions")
+            self._db.executemany("INSERT INTO paper_positions(symbol, quantity) VALUES(?, ?)", [(s, str(q)) for s, q in self._positions.items()])
+            self._db.execute("INSERT INTO paper_orders VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (order.id, order.client_order_id, order.symbol, order.side, str(order.quantity), str(order.price), order.status, order.mode))
+            self._db.commit()
             return order
