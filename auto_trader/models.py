@@ -16,6 +16,7 @@ class OrderRequest(BaseModel):
     side: Literal["BUY", "SELL"]
     quantity: Decimal = Field(gt=0)
     price: Decimal = Field(gt=0)
+    client_order_id: str | None = Field(default=None, max_length=36, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class Order(BaseModel):
@@ -25,8 +26,8 @@ class Order(BaseModel):
     side: Literal["BUY", "SELL"]
     quantity: Decimal
     price: Decimal
-    status: Literal["FILLED", "REJECTED"]
-    mode: Literal["PAPER", "DRY_RUN"]
+    status: Literal["SUBMITTED", "ACCEPTED", "PARTIALLY_FILLED", "FILLED", "REJECTED"]
+    mode: Literal["PAPER", "DRY_RUN", "LIVE"]
 
 
 class Portfolio(BaseModel):

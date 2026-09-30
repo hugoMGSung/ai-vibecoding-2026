@@ -1,4 +1,4 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 import random
 import asyncio
 from typing import Literal
@@ -15,7 +15,7 @@ from .toss_client import TossApiError, TossClient
 from .strategy import evaluate
 
 app = FastAPI(title="Toss Auto Trader", version="0.2.0")
-broker = PaperBroker(settings.paper_initial_cash)
+broker = PaperBroker(settings.paper_initial_cash, settings.paper_commission_rate)
 toss = TossClient()
 prices: dict[str, Price] = {}
 STOCK_ALIASES = {
@@ -50,7 +50,11 @@ STOCK_ALIASES = {
     "sk텔레콤": "017670", "kt": "030200", "lg": "003550",
 }
 SYMBOL_NAMES = {symbol: name for name, symbol in STOCK_ALIASES.items()}
-mode: Literal["PAPER", "DRY_RUN"] = settings.trading_mode if settings.trading_mode in ("PAPER", "DRY_RUN") else "PAPER"
+
+
+def is_kr_symbol(symbol: str) -> bool:
+    return symbol.isdigit() and len(symbol) == 6
+mode: Literal["PAPER", "DRY_RUN", "LIVE"] = settings.trading_mode if settings.trading_mode in ("PAPER", "DRY_RUN", "LIVE") else "PAPER"
 auto_task: asyncio.Task | None = None
 auto_state = {"running": False, "last_action": "", "message": "대기 중"}
 auto_history: list[dict[str, str]] = []
@@ -74,6 +78,14 @@ async def toss_status(symbol: str = "000660") -> dict[str, str | bool]:
         return {"connected": True, "label": "연결됨"}
     except TossApiError as exc:
         return {"connected": False, "label": "연결실패", "detail": str(exc)}
+
+
+@app.get("/api/v1/live/accounts")
+async def live_accounts() -> list[dict]:
+    try:
+        return await toss.accounts()
+    except TossApiError as exc:
+        raise HTTPException(502, str(exc)) from exc
 
 
 @app.get("/api/v1/market/prices", response_model=list[Price])
@@ -151,6 +163,8 @@ async def portfolio_summary() -> dict:
     orders = [item for item in broker.orders() if item.status == "FILLED" and item.mode == "PAPER"]
     rows, total_cost, total_value = [], Decimal("0"), Decimal("0")
     for symbol, quantity in portfolio.positions.items():
+        if quantity <= 0:
+            continue
         buys = [item for item in orders if item.symbol == symbol and item.side == "BUY"]
         sells = [item for item in orders if item.symbol == symbol and item.side == "SELL"]
         cost = sum((item.quantity * item.price for item in buys), Decimal("0")) - sum((item.quantity * item.price for item in sells), Decimal("0"))
@@ -164,14 +178,27 @@ async def portfolio_summary() -> dict:
 
 
 @app.get("/api/v1/capital")
-def get_capital() -> dict[str, Decimal | str]:
+async def get_capital() -> dict[str, Decimal | str]:
     portfolio = broker.portfolio()
+    if portfolio.positions:
+        try:
+            live = await toss.prices(list(portfolio.positions))
+            prices.update({item.symbol: item for item in live})
+        except Exception:
+            pass
+    stock_value = sum((quantity * prices[symbol].price for symbol, quantity in portfolio.positions.items() if symbol in prices), Decimal("0"))
+    total_assets = portfolio.cash + stock_value
+    total_profit = total_assets - settings.paper_initial_cash
     return {
         "mode": mode,
         "account_cash": portfolio.cash,
         "recommended_amount": (portfolio.cash * settings.recommended_trade_ratio).quantize(Decimal("0.01")),
         "recommended_ratio": settings.recommended_trade_ratio,
         "currency": "KRW",
+        "stock_value": stock_value,
+        "total_assets": total_assets,
+        "total_profit": total_profit,
+        "total_return_rate": ((total_profit / settings.paper_initial_cash * 100) if settings.paper_initial_cash else Decimal("0")).quantize(Decimal("0.01")),
     }
 
 
@@ -256,7 +283,7 @@ def update_recommended_ratio(request: RatioUpdate) -> dict[str, Decimal]:
 
 @app.get("/api/v1/recommendations", response_model=list[Recommendation])
 async def recommendations() -> list[Recommendation]:
-    all_symbols = list(dict.fromkeys(STOCK_ALIASES.values()))
+    all_symbols = [symbol for symbol in dict.fromkeys(STOCK_ALIASES.values()) if is_kr_symbol(symbol)]
     sampled_symbols = random.SystemRandom().sample(all_symbols, min(30, len(all_symbols)))
     try:
         universe = await toss.prices(sampled_symbols)
@@ -275,14 +302,29 @@ def get_orders() -> list[Order]:
 
 
 @app.post("/api/v1/orders", response_model=Order)
-def create_order(request: OrderRequest) -> Order:
+async def create_order(request: OrderRequest) -> Order:
+    if not is_kr_symbol(request.symbol):
+        raise HTTPException(400, "현재는 국내 주식만 거래할 수 있습니다.")
     if mode == "PAPER" and request.symbol not in prices:
         raise HTTPException(400, "paper mode requires a known price")
+    if mode == "LIVE":
+        if not settings.live_trading_enabled:
+            raise HTTPException(403, "LIVE 거래가 비활성화되어 있습니다. LIVE_TRADING_ENABLED=true 설정이 필요합니다.")
+        try:
+            return await toss.place_order(request)
+        except TossApiError as exc:
+            raise HTTPException(502, str(exc)) from exc
     return broker.place(request, mode)
 
 
 @app.post("/api/v1/mode/{new_mode}")
-def set_mode(new_mode: Literal["PAPER", "DRY_RUN"]) -> dict[str, str]:
+def set_mode(new_mode: Literal["PAPER", "DRY_RUN", "LIVE"]) -> dict[str, str]:
     global mode
+    if new_mode == "LIVE" and not settings.live_trading_enabled:
+        raise HTTPException(403, "LIVE 거래가 비활성화되어 있습니다. 환경변수 LIVE_TRADING_ENABLED=true로 명시적으로 활성화하세요.")
+    if new_mode == "LIVE" and not settings.toss_account_seq:
+        raise HTTPException(400, "LIVE 거래에는 TOSS_ACCOUNT_SEQ가 필요합니다.")
     mode = new_mode
     return {"mode": mode}
+
+

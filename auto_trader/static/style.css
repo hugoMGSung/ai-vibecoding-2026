@@ -79,10 +79,13 @@ h1 {
 .portfolio-total strong { font-size: 23px }
 .profit { color: #f04438 }
 .loss { color: #2e6de6 }
+.sell-position { padding: 7px 12px; background: #d92d20; color: #fff; border: 0; border-radius: 7px; cursor: pointer; font-weight: 700 }
 .capital-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px }
 .capital-grid > div { background: var(--subtle); border-radius: 10px; padding: 16px }
 .label { display: block; color: #667085; font-size: 13px; margin-bottom: 8px }
 .capital-grid strong { font-size: 22px }
+.total-portfolio-return { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: var(--subtle); color: var(--muted) }
+.total-portfolio-return strong { font-size: 22px }
 .ratio-control { margin-top: 18px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px }
 .ratio-row { display: flex; align-items: center; gap: 6px }
 .ratio-row input { width: 72px; padding: 8px; text-align: right }
