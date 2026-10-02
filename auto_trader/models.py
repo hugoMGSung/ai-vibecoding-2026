@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -9,6 +10,7 @@ class Price(BaseModel):
     name: str = ""
     price: Decimal = Field(gt=0)
     currency: str = "KRW"
+    timestamp: datetime | None = None
 
 
 class OrderRequest(BaseModel):
@@ -26,8 +28,16 @@ class Order(BaseModel):
     side: Literal["BUY", "SELL"]
     quantity: Decimal
     price: Decimal
-    status: Literal["SUBMITTED", "ACCEPTED", "PARTIALLY_FILLED", "FILLED", "REJECTED"]
+    status: Literal["SUBMITTED", "ACCEPTED", "PARTIALLY_FILLED", "PENDING", "PENDING_CANCEL", "PENDING_REPLACE", "PARTIAL_FILLED", "FILLED", "CANCELED", "REJECTED", "REPLACED"]
     mode: Literal["PAPER", "DRY_RUN", "LIVE"]
+    created_at: str = ""
+    external_order_id: str | None = None
+
+
+class StrategyBacktestRequest(BaseModel):
+    symbol: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    count: int = Field(default=200, ge=60, le=200)
+    initial_cash: Decimal = Field(default=Decimal("10000000"), gt=0)
 
 
 class Portfolio(BaseModel):

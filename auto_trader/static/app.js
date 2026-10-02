@@ -37,12 +37,37 @@ async function checkTossStatus() {
   button.textContent = "연결 확인 중...";
   button.className = "status-button status-checking";
   try {
-    const symbolInput = $("symbols");
-    const symbol = symbolInput ? (symbolInput.value.split(",")[0] || "000660").trim() : "000660";
-    const response = await fetch(`/api/v1/toss/status?symbol=${encodeURIComponent(symbol)}`);
+    const response = await fetch("/api/v1/toss/status?symbol=000660", { cache: "no-store" });
     const data = await response.json();
-    setTossStatus(Boolean(data.connected), data.label || "연결실패");
-  } catch (_) { setTossStatus(false, "연결실패"); }
+    setTossStatus(response.ok && Boolean(data.connected), data.label || "연결실패");
+    button.title = data.detail || "토스 시세 API 연결 상태";
+  } catch (error) { setTossStatus(false, "연결실패"); button.title = error.message; }
+}
+
+async function loadLiveAccount() {
+  $("live-account-summary").textContent = "실계좌 조회 중...";
+  try {
+    const response = await fetch("/api/v1/live/snapshot", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "실계좌 조회 실패");
+    $("live-account-summary").textContent = `토스 실계좌 · 원화 매수 가능 ${Number(data.cash_krw).toLocaleString()}원 · 달러 매수 가능 ${Number(data.cash_usd).toLocaleString()} USD · 미체결 ${data.open_order_count}건 · PAPER 현금 ${Number(data.paper_cash_for_comparison).toLocaleString()}원`;
+    const container = $("live-account-positions");
+    container.replaceChildren();
+    for (const item of data.positions) {
+      const row = document.createElement("p");
+      row.textContent = `${item.name || item.symbol} (${item.symbol}) · ${item.quantity}주 · 평균 매입가 ${Number(item.average_purchase_price).toLocaleString()} ${item.currency} · 평가 ${Number(item.market_value).toLocaleString()} ${item.currency}`;
+      container.appendChild(row);
+    }
+    if (!data.positions.length) container.textContent = "보유 주식이 없습니다.";
+  } catch (error) { $("live-account-summary").textContent = error.message; $("live-account-positions").replaceChildren(); }
+}
+
+async function loadOperationsStatus() {
+  try {
+    const response = await fetch("/api/v1/operations/status");
+    const data = await response.json();
+    $("operations-alerts").textContent = `운영 경고 ${data.alerts_today}건 · 실계좌 주문 재동기화 ${data.live_reconciliation.ok ? "완료" : "확인 필요"}`;
+  } catch (error) { $("operations-alerts").textContent = `운영 상태 조회 실패: ${error.message}`; }
 }
 
 async function loadMode() {
@@ -91,11 +116,23 @@ async function loadPortfolio() { const r = await fetch("/api/v1/portfolio"); con
 
 if ($("portfolio-summary")) $("portfolio-summary").addEventListener("click", async (event) => { const button = event.target.closest(".sell-position"); if (!button) return; if (!confirm(`${button.dataset.symbol} ${button.dataset.quantity}주를 PAPER 매도할까요?`)) return; const response = await fetch("/api/v1/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: button.dataset.symbol, side: "SELL", quantity: button.dataset.quantity, price: button.dataset.price }) }); const data = await response.json(); if (!response.ok) alert(data.detail || "매도 실패"); await loadPortfolio(); await loadCapital(); });
 async function loadAutoStatus() { const response = await fetch("/api/v1/auto-trader/status"); const data = await response.json(); $("auto-status").textContent = `${data.running ? "실행 중" : "중지됨"} · ${data.message || ""}${data.last_action ? ` · ${data.last_action}` : ""}`; const history = await (await fetch("/api/v1/auto-trader/history")).json(); $("auto-history").innerHTML = history.length ? history.map(item => `<div class="history-row"><time>${item.time}</time><strong>${item.event}</strong><span>${item.detail}</span></div>`).join("") : '<p class="muted">기록이 없습니다.</p>'; }
+async function loadRiskStatus() {
+  try {
+    const response = await fetch("/api/v1/risk/status");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "위험 상태 조회 실패");
+    const button = $("emergency-stop");
+    button.textContent = data.emergency_stop ? "긴급 정지 해제" : "긴급 매매 정지";
+    button.classList.toggle("emergency-active", Boolean(data.emergency_stop));
+    const daily = data.daily_risk_available === false ? `위험 계산 불가 · ${data.risk_error || "시세 확인 실패"}` : `당일 손익 ${Number(data.pnl || 0).toLocaleString()}원 / 손실 한도 -${Number(data.loss_limit || 0).toLocaleString()}원`;
+    $("risk-status").textContent = `${daily} · 주문 최대 ${Number(data.limits.max_order_amount).toLocaleString()}원 · 종목 한도 ${Number(data.limits.max_symbol_exposure_amount).toLocaleString()}원/${Number(data.limits.max_symbol_quantity).toLocaleString()}주 · 전체 보유 한도 ${Number(data.limits.max_portfolio_exposure_amount).toLocaleString()}원 · ${data.emergency_stop ? `비상정지: ${data.emergency_reason}` : data.halted ? `당일 매수 정지: ${data.reason}` : "정상"}${data.live_order_ready ? "" : ` · LIVE 주문 잠김(${data.live_block_reason || "실계좌 위험 확인 필요"})`}`;
+  } catch (error) { $("risk-status").textContent = error.message; }
+}
 function syncAutoButton(running) { const button = $("auto-start"); if (!button) return; button.textContent = running ? "자동매매 중지" : "자동매매 시작"; button.classList.toggle("stop-button", running); }
 async function setAutoTrader(action) { const response = await fetch(`/api/v1/auto-trader/${action}`, { method: "POST" }); const data = await response.json(); if (!response.ok) { $("auto-status").textContent = data.detail || "자동매매 요청 실패"; return; } await loadAutoStatus(); await loadCapital(); await loadPortfolio(); }
 async function toggleAutoTrader() { const response = await fetch("/api/v1/auto-trader/status"); const data = await response.json(); await setAutoTrader(data.running ? "stop" : "start"); syncAutoButton(!data.running); }
 async function refreshDashboard() {
-  await Promise.allSettled([loadCapital(), loadPortfolio(), loadAutoStatus()]);
+  await Promise.allSettled([loadCapital(), loadPortfolio(), loadAutoStatus(), loadRiskStatus(), loadOperationsStatus(), checkTossStatus()]);
 }
 async function findCandidates() {
   $("recommendation-message").textContent = "추천 후보를 찾는 중...";
@@ -189,6 +226,7 @@ if ($("load")) $("load").addEventListener("click", loadPrices);
 if ($("symbols")) $("symbols").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); loadPrices(); } });
 $("refresh-page").addEventListener("click", () => window.location.reload());
 $("toss-status").addEventListener("click", checkTossStatus);
+$("load-live-account").addEventListener("click", loadLiveAccount);
 const autoStartButton = $("auto-start");
 const autoStopButton = $("auto-stop");
 if (autoStartButton) { autoStartButton.textContent = "자동매매 시작"; autoStartButton.addEventListener("click", toggleAutoTrader); }
@@ -213,5 +251,16 @@ $("recommendations").addEventListener("click", async (event) => {
   const order = await response.json();
   alert(response.ok ? `PAPER 주문 ${order.status}` : (order.detail || "주문 실패"));
 });
-loadPrices(); loadCapital(); loadPortfolio(); loadAutoStatus(); checkTossStatus(); loadMode();
+$("emergency-stop").addEventListener("click", async () => {
+  const current = await (await fetch("/api/v1/risk/status")).json();
+  if (current.emergency_stop) {
+    if (!confirm("비상 정지를 해제할까요? 당일 손실 한도 정지는 별도로 유지될 수 있습니다.")) return;
+    await fetch("/api/v1/risk/emergency-stop/clear?confirm=true", { method: "POST" });
+  } else {
+    if (!confirm("긴급 정지하면 자동매매가 멈추고 신규 매수가 차단됩니다. 진행할까요?")) return;
+    await fetch("/api/v1/risk/emergency-stop", { method: "POST" });
+  }
+  await Promise.allSettled([loadRiskStatus(), loadAutoStatus()]);
+});
+loadPrices(); loadCapital(); loadPortfolio(); loadAutoStatus(); loadRiskStatus(); loadOperationsStatus(); checkTossStatus(); loadMode();
 setInterval(refreshDashboard, 30000);

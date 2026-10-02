@@ -48,6 +48,12 @@
             </div>
             <p id="capital-note" class="muted">추천 사용 금액을 계산하는 중...</p>
         </section>
+        <section class="card" id="live-account-card">
+            <div class="section-heading"><h2>실계좌 확인 · 읽기 전용</h2><button id="load-live-account" type="button">실계좌 조회</button></div>
+            <p class="muted">실계좌 정보는 PAPER 포트폴리오와 별도로 표시됩니다. 조회해도 주문은 발생하지 않습니다.</p>
+            <div id="live-account-summary" aria-live="polite">조회 전</div>
+            <div id="live-account-positions"></div>
+        </section>
         <section class="card recommendation-card">
             <div class="section-heading">
                 <h2>추천 후보 TOP 5</h2><button id="find-candidates" type="button">후보찾기</button>
@@ -67,7 +73,7 @@
         </section>
     </main><button id="theme-toggle" class="theme-toggle" type="button">🌙 Dark</button>
     <section class="card portfolio-card"><h2>현재 보유 주식</h2><div id="portfolio-summary" class="portfolio-summary">조회 중...</div></section>
-    <section class="card auto-card"><div class="section-heading"><h2>PAPER 자동매매</h2><div><button id="auto-start" type="button">자동매매 시작</button><button id="auto-stop" class="stop-button" type="button">중지</button></div></div><p id="auto-status" class="muted">상태 확인 중...</p><h3>자동매매 기록</h3><div id="auto-history" class="auto-history"><p class="muted">기록이 없습니다.</p></div></section>
+    <section class="card auto-card"><div class="section-heading"><h2>PAPER 자동매매</h2><div><button id="auto-start" type="button">자동매매 시작</button><button id="auto-stop" class="stop-button" type="button">중지</button></div></div><p id="auto-status" class="muted">상태 확인 중...</p><div class="risk-panel"><div class="section-heading"><h3>거래 안전장치</h3><button id="emergency-stop" class="stop-button" type="button">긴급 매매 정지</button></div><p id="risk-status" class="muted">위험 한도 확인 중...</p><p id="operations-alerts" class="muted">운영 상태 확인 중...</p></div><h3>자동매매 기록</h3><div id="auto-history" class="auto-history"><p class="muted">기록이 없습니다.</p></div></section>
     <script src="/static/app.js"></script>
 </body>
 

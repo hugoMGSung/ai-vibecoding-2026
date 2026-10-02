@@ -219,3 +219,4 @@ __marimo__/
 # Local trading state
 auto_trader.db
 auto_trader.db-*
+auto_trader.lock
